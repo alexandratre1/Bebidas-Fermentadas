@@ -1,0 +1,170 @@
+# ==============================================================================
+# SCRIPT: COMPARATIVE METAGENOMICS VISUALIZATION & INTERSECTIONS
+# ==============================================================================
+
+# --- 1. LIBRERÍAS ---
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(patchwork)
+library(VennDiagram)
+library(grid)
+library(ggvenn)
+
+# --- 2. CONFIGURACIÓN DE RUTAS RELATIVAS ---
+# Definimos la carpeta de resultados como la base para jalar y guardar datos
+RESULTS_DIR <- "./results"
+bebidas     <- c("kefir", "kombucha", "pozol", "pulque")
+
+# --- 3. FUNCIÓN MAESTRA DE PROCESAMIENTO ---
+procesar_todo <- function(nombre_bebida) {
+  message(paste("--- Procesando:", toupper(nombre_bebida), "---"))
+  
+  # 3.1 Cargar Taxonomía (Buscando en la estructura organizada)
+  tax_file <- file.path(RESULTS_DIR, paste0(nombre_bebida, "_mags_fijo.txt"))
+  if (!file.exists(tax_file)) {
+    message(paste("X No se encontró el archivo de taxonomía:", tax_file))
+    return(NULL)
+  }
+  tax <- read.table(tax_file, header=TRUE, sep="\t", fill=TRUE, check.names=FALSE)
+  tax$Genoma <- gsub(".fasta_assembly", "", tax$Genoma)
+  
+  # 3.2 Cargar BUSCO 
+  busco_file <- if(nombre_bebida == "kombucha") {
+    file.path(RESULTS_DIR, "busco_outputs", "kombucha_busco.txt")
+  } else {
+    file.path(RESULTS_DIR, "busco_outputs", paste0(nombre_bebida, "_busco.txt"))
+  }
+  
+  if (file.exists(busco_file)) {
+    busco <- read.table(busco_file, header=TRUE, sep="\t", check.names=FALSE)
+    colnames(busco) <- c("Genoma", "S", "D", "F", "M")
+    busco$Genoma <- gsub(".fasta_assembly", "", busco$Genoma)
+    tax <- left_join(tax, busco, by="Genoma")
+    message("V Archivo BUSCO cargado correctamente.")
+  }
+  
+  # 3.3 Cargar Genes (EggNOG) - Buscando dentro de results/eggnog_output
+  prefijo <- case_when(
+    nombre_bebida == "kefir"    ~ "SRR13801",
+    nombre_bebida == "pulque"   ~ "SRR10997",
+    nombre_bebida == "pozol"    ~ "SRR13708",
+    nombre_bebida == "kombucha" ~ "SRR19040"
+  )
+  
+  eggnog_dir <- file.path(RESULTS_DIR, "eggnog_output")
+  todos_los_anot <- list.files(path = eggnog_dir, pattern = "\\.annotations$", recursive = TRUE, full.names = TRUE)
+  archivos_bebida <- todos_los_anot[grepl(prefijo, basename(todos_los_anot))]
+  
+  if(length(archivos_bebida) > 0) {
+    message(paste("V Encontrados", length(archivos_bebida), "archivos de anotaciones."))
+    conteo_df <- map_df(archivos_bebida, function(f) {
+      n_genes <- sum(!grepl("^#", readLines(f)))
+      id_limpio <- basename(f) %>% 
+        gsub("_eggnog.*", "", .) %>% 
+        gsub(".fasta_assembly", "", .) %>% 
+        gsub(".emapper.*", "", .)
+      data.frame(Genoma = id_limpio, Genes = n_genes)
+    })
+    tax <- left_join(tax, conteo_df, by = "Genoma")
+  } else {
+    message("X No se encontraron archivos de anotaciones para este prefijo.")
+  }
+  
+  tax %>% mutate(Bebida = tools::toTitleCase(nombre_bebida))
+}
+
+# --- 4. EJECUCIÓN ---
+df_master <- map_df(bebidas, procesar_todo)
+df_master[is.na(df_master)] <- 0
+
+# --- 5. GENERACIÓN DE GRÁFICAS ---
+
+# Gráfica A: Taxonomía
+df_a <- df_master %>% count(Bebida, Genero) %>% group_by(Bebida) %>%
+  mutate(Percent = n/sum(n)*100, Taxon = ifelse(Percent < 3, "Other", Genero))
+
+grafica_A <- ggplot(df_a, aes(x = Bebida, y = Percent, fill = Taxon)) +
+  geom_bar(stat = "identity", color = "white", linewidth = 0.2) + 
+  theme_classic() +
+  scale_fill_manual(values = colorRampPalette(RColorBrewer::brewer.pal(12, "Set3"))(length(unique(df_a$Taxon)))) +
+  labs(title = "A. Taxonomic Distribution", y = "Relative Abundance (%)")
+
+# Gráfica B: Calidad BUSCO
+grafica_B <- df_master %>%
+  pivot_longer(cols = c(S, D, F, M), names_to = "Categoria", values_to = "Valor") %>%
+  mutate(Categoria = factor(Categoria, levels=c("M","F","D","S"), 
+                            labels=c("Missing","Fragmented","Duplicated","Single-copy"))) %>%
+  ggplot(aes(x=Genoma, y=Valor, fill=Categoria)) +
+  geom_bar(stat="identity", width=0.9) + 
+  facet_wrap(~Bebida, scales="free_x", nrow=1) +
+  scale_fill_manual(values=c("#7a0177", "#2c7fb8", "#feb24c", "#3f007d")) + 
+  theme_minimal() + 
+  labs(title = "B. Genomic Quality (BUSCO)", y = "Percentage (%)") +
+  theme(axis.text.x = element_blank())
+
+# Gráfica C: Abundancia de Genes
+df_c <- df_master %>% group_by(Bebida, Genero) %>% 
+  summarise(Suma_Genes = sum(Genes), .groups = 'drop') %>%
+  group_by(Bebida) %>% mutate(RelAb = (Suma_Genes / sum(Suma_Genes)) * 100,
+                              Taxon = ifelse(RelAb < 3, "Other", Genero))
+
+grafica_C <- ggplot(df_c, aes(x = Bebida, y = RelAb, fill = Taxon)) +
+  geom_bar(stat = "identity", color = "white", linewidth = 0.2) + 
+  theme_classic() +
+  scale_fill_manual(values = colorRampPalette(RColorBrewer::brewer.pal(12, "Paired"))(length(unique(df_c$Taxon)))) +
+  labs(title = "C. Functional Gene Abundance", y = "Gene Abundance (%)")
+
+# --- 6. ENSAMBLE Y GUARDADO DEL PANEL ---
+panel_final <- (grafica_B) / (grafica_A | grafica_C) + 
+  plot_annotation(title = 'Comparative Metagenomics: Mexican Fermented Beverages',
+                  theme = theme(plot.title = element_text(size = 18, face = "bold", hjust = 0.5)))
+
+# Guardar automáticamente el panel en la carpeta results/
+ggsave(file.path(RESULTS_DIR, "bebidas_fermentadas_panel.png"), plot = panel_final, width = 14, height = 10, dpi = 300)
+
+# --- 7. DIAGRAMA DE VENN ---
+L <- map(bebidas, function(b) {
+  file_name <- file.path(RESULTS_DIR, paste0(b, "_mags_fijo.txt"))
+  if (file.exists(file_name)) {
+    df <- read.table(file_name, header = TRUE, sep = "\t", fill = TRUE)
+    generos <- df$Genero[df$Genero != "Unclassified" & df$Genero != "" & !is.na(df$Genero)]
+    return(unique(generos))
+  }
+})
+names(L) <- tools::toTitleCase(bebidas)
+
+intersect_label <- function(sets) {
+  res <- Reduce(intersect, L[sets])
+  if(length(res) > 0) paste(head(res, 3), collapse = ", ") else "None"
+}
+
+leyenda_detallada <- paste0(
+  "SHARED GENERA:\n\n",
+  "• Pozol + Pulque:\n  ", intersect_label(c("Pozol", "Pulque")), "\n\n",
+  "• Kefir + Pozol:\n  ",  intersect_label(c("Kefir", "Pozol")), "\n\n",
+  "• Kombucha + Pulque:\n  ", intersect_label(c("Kombucha", "Pulque")), "\n\n",
+  "• Kefir + Kombucha:\n  ", intersect_label(c("Kefir", "Kombucha")), "\n\n",
+  "• CORE MICROBIOME (In all 4):\n  ", intersect_label(names(L))
+)
+
+p <- ggvenn(L, 
+            fill_color = c("#7CAE00", "#F8766D", "#C77CFF", "#00BFC4"),
+            stroke_size = 0.5, 
+            set_name_size = 5, 
+            text_size = 4)
+
+p_final <- p + 
+  annotate("text", x = 1.8, y = 0, label = leyenda_detallada, 
+           hjust = 0, size = 3.2, fontface = "italic", color = "grey20") +
+  scale_x_continuous(limits = c(-2, 3.5)) + 
+  labs(title = "Taxonomic Intersection Analysis",
+       subtitle = "Genus-level relationship between traditional fermented beverages") +
+  theme(plot.title = element_text(hjust = 0.2, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.2))
+
+# Guardar automáticamente el Venn en la carpeta results/
+ggsave(file.path(RESULTS_DIR, "intersecciones_venn.png"), plot = p_final, width = 12, height = 8, dpi = 300)
+
+message("✅ ¡Gráficos generados y guardados con éxito en la carpeta /results!")
