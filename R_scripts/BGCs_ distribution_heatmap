@@ -1,0 +1,117 @@
+# ==============================================================================
+# SCRIPT: FUNCTIONAL ANALYSIS - BGC DISTRIBUTIONS & HEATMAPS (antiSMASH)
+# ==============================================================================
+
+# 0. Limpieza de motores gráficos previos
+if(!is.null(dev.list())) dev.off()
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# --- 1. CONFIGURACIÓN DE RUTAS RELATIVAS ---
+RESULTS_DIR  <- "./results"
+INPUT_CSV    <- file.path(RESULTS_DIR, "BGC.csv")
+OUTPUT_FACET <- file.path(RESULTS_DIR, "grafica_BGC_por_bebida.pdf")
+OUTPUT_HEAT  <- file.path(RESULTS_DIR, "heatmap_BGC_azules.pdf")
+
+# Validar existencia del archivo central de BGCs
+if (!file.exists(INPUT_CSV)) {
+  stop("❌ Error: No se encuentra el archivo 'BGC.csv' en la carpeta /results. Por favor colócalo ahí antes de correr el script.")
+}
+
+# --- 2. CARGA DE DATOS Y LIMPIEZA INICIAL ---
+message("📥 Cargando y limpiando la base de datos de BGCs (antiSMASH)...")
+# Usamos latin1 para proteger el parseo contra caracteres extraños o mutibyte
+df <- read.csv(INPUT_CSV, sep = ";", stringsAsFactors = FALSE, fileEncoding = "latin1")
+
+# Homogeneizar espacios en blanco y nombres de columnas
+df_clean <- df %>%
+  rename_with(trimws) %>%
+  mutate(across(where(is.character), trimws))
+
+# ==============================================================================
+# 3. PARTE A: GRÁFICO DE BARRAS APILADAS (FACETED BGC COUNTS)
+# ==============================================================================
+message("📊 Generando gráfico de distribución de frecuencias por especie...")
+
+df_counts <- df_clean %>%
+  filter(Similarity != "" & !is.na(Similarity)) %>%
+  count(Beverage, Scientific.Name, Similarity)
+
+# Forzar orden jerárquico del factor de similitud (Tipo Semáforo)
+df_counts$Similarity <- factor(df_counts$Similarity, levels = c("Low", "Medium", "High"))
+
+grafica_facet <- ggplot(df_counts, aes(y = reorder(Scientific.Name, n, sum), x = n, fill = Similarity)) +
+  geom_col(color = "black", linewidth = 0.2) +
+  facet_wrap(~Beverage, scales = "free_y") + 
+  scale_fill_manual(values = c("Low" = "#e74c3c", "Medium" = "#f1c40f", "High" = "#2ecc71")) +
+  labs(
+    title = "Biosynthetic Gene Clusters (BGCs) Distribution by Beverage",
+    subtitle = "Abundance of clusters grouped by producing species and MIBiG similarity",
+    x = "BGC Count",
+    y = "Scientific Name",
+    fill = "Similarity Level"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(face = "italic", size = 8),
+    strip.background = element_rect(fill = "gray95", color = "#d3d3d3"), 
+    strip.text = element_text(face = "bold", size = 10),
+    panel.spacing = unit(1, "lines"),
+    plot.title = element_text(face = "bold", size = 14),
+    legend.position = "bottom"
+  )
+
+# Guardar Gráfico de Barras Facetado
+ggsave(OUTPUT_FACET, plot = grafica_facet, width = 12, height = 10, device = "pdf")
+message(paste("✅ Gráfico facetado de barras guardado en:", OUTPUT_FACET))
+
+
+# ==============================================================================
+# 4. PARTE B: MAPA DE CALOR ESTRUCTURAL (BGCs HEATMAP)
+# ==============================================================================
+message("🔥 Generando Heatmap de confianza metabólica...")
+
+# Nota: El script busca dinámicamente la columna que empiece con 'antiSMASH' 
+# para mitigar problemas si el archivo tiene símbolos raros como 'antiSMASH.'
+col_antismash <- grep("^antiSMASH", colnames(df_clean), value = TRUE)[1]
+
+if(is.na(col_antismash)) {
+  stop("❌ Error: No se detectó la columna descriptiva de antiSMASH en el archivo CSV.")
+}
+
+df_heat <- df_clean %>%
+  select(Beverage, Scientific.Name, Compound = all_of(col_antismash), Similarity) %>% 
+  filter(Similarity != "" & !is.na(Similarity) & Compound != "")
+
+# Escala de Azules de alta confianza visual
+colores_azules <- c("Low" = "#d1e8ff", "Medium" = "#3498db", "High" = "#2c3e50")
+df_heat$Similarity <- factor(df_heat$Similarity, levels = c("Low", "Medium", "High"))
+
+grafica_heatmap <- ggplot(df_heat, aes(x = Compound, y = Scientific.Name, fill = Similarity)) +
+  geom_tile(color = "white", linewidth = 0.3) + 
+  facet_wrap(~Beverage, scales = "free") + 
+  scale_fill_manual(values = colores_azules) +
+  labs(
+    title = "Biosynthetic Gene Clusters (BGCs) Profile Map",
+    subtitle = "Compound presence annotated by antiSMASH confidence level",
+    x = "Detected Compound / Cluster Family",
+    y = "Species (Scientific Name)",
+    fill = "Confidence"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8), 
+    axis.text.y = element_text(face = "italic", size = 8),
+    strip.background = element_rect(fill = "#f0f0f0", color = NA),
+    strip.text = element_text(face = "bold", size = 10),
+    panel.grid = element_blank(),
+    plot.title = element_text(face = "bold", size = 14)
+  )
+
+# Guardar Heatmap
+ggsave(OUTPUT_HEAT, plot = grafica_heatmap, width = 12, height = 8, device = "pdf")
+message(paste("✅ Heatmap funcional de BGCs guardado en:", OUTPUT_HEAT))
+
+message("\n🏁 [ANÁLISIS DE BGCs COMPLETADO AL 100%]")
