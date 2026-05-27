@@ -1,0 +1,99 @@
+# ==============================================================================
+# SCRIPT: TAXONOMIC COMPOSITION AT FAMILY LEVEL (> 0.1%)
+# ==============================================================================
+
+# --- 1. LIBRERÍAS ---
+library(tidyverse)
+library(RColorBrewer)
+library(stringr)
+
+# --- 2. CONFIGURACIÓN DE RUTAS RELATIVAS ---
+RESULTS_DIR <- "./results"
+
+# Mapeo de archivos apuntando de forma interna a la carpeta results
+files_familia <- list(
+  Kefir    = file.path(RESULTS_DIR, "0.1_fullkefir_kaijub.txt"),
+  Kombucha = file.path(RESULTS_DIR, "0.1_fullkombucha_kaiju.txt"), 
+  Pozol    = file.path(RESULTS_DIR, "0.1_fullpozol_kaiju.txt"), 
+  Pulque   = file.path(RESULTS_DIR, "0.1_fullpulque_kaiju.txt")
+)
+
+# --- 3. FUNCIÓN DE PROCESAMIENTO ---
+procesar_familia_directo <- function(ruta, nombre_bebida) {
+  if (!file.exists(ruta)) {
+    message(paste("X No se encuentra el archivo:", ruta))
+    return(NULL)
+  }
+  
+  df <- read.table(ruta, header = FALSE, sep = "\t", fill = TRUE, stringsAsFactors = FALSE)
+  
+  # Limpiar filas con números en V2 (evita errores de encabezados)
+  df <- df[grepl("^[0-9.]+$", df$V2), ]
+  
+  df_clean <- df %>%
+    mutate(V2 = as.numeric(V2)) %>%
+    filter(V2 > 0.1) %>% 
+    unite("Tax", 5:ncol(df), sep = " ", remove = TRUE, na.rm = TRUE) %>%
+    mutate(Familia = str_extract(Tax, "\\b\\w+aceae\\b")) %>%
+    filter(!is.na(Familia)) %>%
+    select(Sample = V1, percent = V2, Familia) %>%
+    mutate(Bebida = nombre_bebida)
+  
+  return(df_clean)
+}
+
+# --- 4. GENERAR, MOSTRAR Y GUARDAR LOS GRÁFICOS ---
+message("--- Generando gráficos a nivel Familia y guardando en /results ---")
+
+for (nombre in names(files_familia)) {
+  
+  datos_raw <- procesar_familia_directo(files_familia[[nombre]], nombre)
+  
+  if (is.null(datos_raw) || nrow(datos_raw) == 0) next
+  
+  # Seleccionar Top 15 familias
+  top_15 <- datos_raw %>%
+    group_by(Familia) %>%
+    summarise(total = sum(percent)) %>%
+    arrange(desc(total)) %>%
+    head(15) %>% pull(Familia)
+  
+  plot_data <- datos_raw %>%
+    mutate(Familia_Final = if_else(Familia %in% top_15, Familia, "Otros")) %>%
+    mutate(Familia_Final = factor(Familia_Final, levels = c(sort(top_15), "Otros"))) %>%
+    group_by(Sample, Familia_Final) %>%
+    summarise(Abundancia = sum(percent), .groups = "drop") %>%
+    mutate(Familia_Final = droplevels(Familia_Final))
+  
+  n_fam <- length(levels(plot_data$Familia_Final))
+  colores <- c(colorRampPalette(brewer.pal(12, "Paired"))(n_fam - 1), "#D3D3D3")
+  
+  # Construir el objeto ggplot
+  p <- ggplot(plot_data, aes(x = Sample, y = Abundancia, fill = Familia_Final)) +
+    geom_bar(stat = "identity", position = "fill", width = 0.9) +
+    scale_y_continuous(labels = scales::percent, expand = c(0,0)) +
+    scale_fill_manual(values = colores, drop = TRUE) +
+    theme_minimal() +
+    labs(
+      title = paste("Taxonomic Composition:", nombre),
+      subtitle = "Families with Relative Abundance > 0.1%",
+      x = "Samples (SRR Run)", y = "Relative Abundance (%)", fill = "Family"
+    ) +
+    theme(
+      axis.text.x = element_text(angle = 90, vjust = 0.5, size = 8),
+      panel.grid = element_blank(),
+      plot.title = element_text(face = "bold", size = 14)
+    )
+  
+  # 1. Imprimir en pantalla por si quieres verlo en RStudio
+  print(p)
+  
+  # 2. GUARDADO AUTOMÁTICO EN LA CARPETA RESULTS
+  # Guarda cada gráfico con un nombre limpio en minúsculas (ej: familia_abundance_pozol.png)
+  output_name <- paste0("familia_abundance_", tolower(nombre), ".png")
+  ggsave(file.path(RESULTS_DIR, output_name), plot = p, width = 10, height = 7, dpi = 300)
+  
+  message(paste("V Gráfico de", nombre, "guardado como:", output_name))
+}
+
+message("--- Proceso terminado con éxito ---")
