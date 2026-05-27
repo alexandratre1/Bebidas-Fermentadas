@@ -1,0 +1,51 @@
+#!/bin/bash
+# ==========================================
+# PIPELINE 1: QUALITY CONTROL & TRIMMING (SE)
+# ==========================================
+
+# --- CONFIGURACIÓN DE RUTAS ---
+# Ajusta esta ruta a donde se encuentre el adaptador en tu entorno Conda
+ADAPTERS="$HOME/.conda/envs/metagenomics/share/trimmomatic-0.39-2/adapters/TruSeq3-SE.fa"
+THREADS=4
+OUTPUT_DOCS="~/dc_workshop/docs"
+
+# 1. Ejecutar FastQC inicial
+echo "📊 Corriendo FastQC inicial..."
+fastqc *.fastq.gz
+
+# Unzip de los resultados de FastQC
+for filename in *.zip; do
+    unzip -q "$filename"
+done
+
+# Crear resumen inicial
+mkdir -p "$OUTPUT_DOCS"
+cat */summary.txt > "${OUTPUT_DOCS}/fastqc_summaries_initial.txt"
+rm -rf SRR*/ # Limpieza
+
+# 2. Ejecutar Trimmomatic SE
+echo "✂️ Iniciando Trimming con Trimmomatic..."
+for file in *.fastq.gz; do
+    [ -e "$file" ] || continue
+    base=$(basename "$file" .fastq.gz)
+    output="${base}_trimmed.fastq.gz"
+
+    echo "🔄 Procesando: $file -> $output"
+    trimmomatic SE -threads $THREADS "$file" "$output" \
+        ILLUMINACLIP:${ADAPTERS}:2:30:10 SLIDINGWINDOW:4:20 MINLEN:50
+done
+
+# 3. FastQC final y MultiQC
+echo "📊 Corriendo FastQC post-trimming..."
+fastqc *_trimmed.fastq.gz
+
+for filename in *_fastqc.zip; do
+    unzip -q "$filename"
+done
+
+cat *_trimmed_fastqc/summary.txt > "${OUTPUT_DOCS}/fastqc_summaries_trimmed.txt"
+
+echo "📈 Generando reporte global con MultiQC..."
+multiqc .
+
+echo "✅ Proceso completado con éxito."
