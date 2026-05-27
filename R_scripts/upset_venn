@@ -1,0 +1,118 @@
+# ==============================================================================
+# SCRIPT: TAXONOMIC INTERSECTIONS (VENN & UPSET PLOTS) - SERVER SAFE M0DE
+# ==============================================================================
+
+# 1. Cargar librerías y limpiar ambiente
+if(!is.null(dev.list())) dev.off()
+library(tidyverse)
+library(VennDiagram) 
+library(UpSetR)
+library(grid)
+library(stringr)
+
+# Desactivar logs de Venn para evitar archivos .log basura en el repositorio
+futile.logger::flog.threshold(futile.logger::ERROR)
+
+# --- CONFIGURACIÓN DE RUTAS RELATIVAS ---
+RESULTS_DIR <- "./results"
+OUTPUT_PDF  <- file.path(RESULTS_DIR, "Analisis_Interseccion_Final_Bebidas.pdf")
+
+# --- FUNCIONES DE LECTURA DE DATOS ---
+leer_generos <- function(ruta) {
+  if(!file.exists(ruta)) {
+    message(paste("X Archivo no encontrado:", ruta))
+    return(NULL)
+  }
+  df <- read.table(ruta, header = TRUE, sep = "\t", fill = TRUE, quote = "", check.names = FALSE)
+  colnames(df) <- trimws(tolower(colnames(df)))
+  df %>% mutate(percent = as.numeric(percent)) %>%
+    filter(!is.na(percent), percent > 0.1) %>% 
+    filter(!grepl("unclassified|cannot|cellular organisms|non-viral", taxon_name, ignore.case = TRUE)) %>%
+    pull(taxon_name) %>% unique()
+}
+
+leer_familias <- function(ruta) {
+  if(!file.exists(ruta)) {
+    message(paste("X Archivo no encontrado:", ruta))
+    return(NULL)
+  }
+  df <- read.table(ruta, header = FALSE, sep = "\t", fill = TRUE, stringsAsFactors = FALSE, quote = "")
+  df <- df %>% filter(V1 != "file", V2 != "percent") %>%
+    mutate(V2 = as.numeric(V2)) %>% filter(!is.na(V2), V2 > 0.1)
+  df$TaxCompleta <- do.call(paste, c(df[5:ncol(df)], sep = " "))
+  familias <- str_extract(df$TaxCompleta, "\\b\\w+aceae\\b")
+  unique(familias[!is.na(familias) & !grepl("unclassified|cannot", familias, ignore.case = TRUE)])
+}
+
+# 2. MAPEANDO LOS DATOS DENTRO DE /RESULTS
+archivos_gen <- c(
+  Kefir    = file.path(RESULTS_DIR, "kefir_gkaiju.txt"), 
+  Kombucha = file.path(RESULTS_DIR, "kombucha_gkaiju.txt"), 
+  Pozol    = file.path(RESULTS_DIR, "pozol_gkaiju.txt"), 
+  Pulque   = file.path(RESULTS_DIR, "pulque_gkaiju.txt")
+)
+
+archivos_fam <- c(
+  Kefir    = file.path(RESULTS_DIR, "0.1_fullkefir_kaijub.txt"), 
+  Kombucha = file.path(RESULTS_DIR, "0.1_fullkombucha_kaiju.txt"), 
+  Pozol    = file.path(RESULTS_DIR, "0.1_fullpozol_kaiju.txt"), 
+  Pulque   = file.path(RESULTS_DIR, "0.1_fullpulque_kaiju.txt")
+)
+
+message("📥 Cargando perfiles taxonómicos...")
+lista_generos  <- map(archivos_gen, leer_generos)
+lista_familias <- map(archivos_fam, leer_familias)
+
+# Eliminar nulos en caso de que falte alguna muestra
+lista_generos  <- compact(lista_generos)
+lista_familias <- compact(lista_familias)
+
+################################################################################
+### 3. GENERAR PDF MULTIPÁGINA
+################################################################################
+
+message("🎨 Renderizando PDF multi-página...")
+pdf(OUTPUT_PDF, width = 11, height = 8.5)
+
+# --- A. VENN GÉNEROS ---
+if(length(lista_generos) > 0) {
+  grid.newpage()
+  v_gen <- venn.diagram(
+    x = lista_generos, category.names = names(lista_generos),
+    filename = NULL, fill = c("#3498db", "#e74c3c", "#2ecc71", "#f1c40f"),
+    alpha = 0.5, main = "Taxonomic Intersection: Genus Level (> 0.1%)",
+    cat.cex = 1.2, main.cex = 1.5
+  )
+  grid.draw(v_gen)
+}
+
+# --- B. VENN FAMILIAS ---
+if(length(lista_familias) > 0) {
+  grid.newpage()
+  v_fam <- venn.diagram(
+    x = lista_familias, category.names = names(lista_familias),
+    filename = NULL, fill = c("#9b59b6", "#1abc9c", "#e67e22", "#34495e"),
+    alpha = 0.5, main = "Taxonomic Intersection: Family Level (> 0.1%)",
+    cat.cex = 1.2, main.cex = 1.5
+  )
+  grid.draw(v_fam)
+}
+
+# --- C. UPSETS PLOTS ---
+if(length(lista_generos) > 0) {
+  try({
+    print(upset(fromList(lista_generos), nsets = length(lista_generos), order.by = "freq", main.bar.color = "#2c3e50"))
+    grid.text("UpSet Plot: Genus Distribution", x = 0.5, y = 0.95, gp = gpar(fontsize = 14, fontface = "bold"))
+  })
+}
+
+if(length(lista_familias) > 0) {
+  try({
+    print(upset(fromList(lista_familias), nsets = length(lista_familias), order.by = "freq", main.bar.color = "#4a235a"))
+    grid.text("UpSet Plot: Family Distribution", x = 0.5, y = 0.95, gp = gpar(fontsize = 14, fontface = "bold"))
+  })
+}
+
+dev.off()
+
+message(paste("--- ¡COMPLETADO! El reporte se guardó en:", OUTPUT_PDF, "---"))
