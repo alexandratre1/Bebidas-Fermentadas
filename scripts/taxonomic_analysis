@@ -1,0 +1,48 @@
+#!/bin/bash
+# ==========================================
+# PIPELINE 2: KAIJU TAXONOMIC CLASSIFICATION
+# ==========================================
+
+# --- CONFIGURACIÓN DE LA MUESTRA Y RUTAS ---
+BEBIDA="pozol"  # <--- ¡CAMBIA AQUÍ LA BEBIDA! (pozol, kefir, kombucha, pulque)
+BASE_DIR="/data2/Alexandra/${BEBIDA}" # Ruta base en el servidor
+
+input_dir="${BASE_DIR}"
+output_dir="${BASE_DIR}/kaiju_out"
+db_nodes="/data2/kaijudb/nodes.dmp"
+db_names="/data2/kaijudb/names.dmp"
+db_kaiju="/data2/kaijudb/nr_euk/kaiju_db_nr_euk.fmi"
+
+# Rutas a binarios
+kaiju_bin="/opt/kaiju/bin/kaiju"
+kaiju2table_bin="/opt/kaiju/bin/kaiju2table"
+
+# --- EJECUCIÓN ---
+mkdir -p "$output_dir"
+echo "🚀 Iniciando clasificación con Kaiju para la bebida: $BEBIDA..."
+
+for fastq in "$input_dir"/*_trimmed.fastq.gz; do
+    [ -e "$fastq" ] || continue
+    sample=$(basename "$fastq")
+    sample="${sample%%.*}"
+
+    echo "🔄 Procesando muestra: $sample"
+    kaiju_output="${output_dir}/${sample}_kaiju.out"
+
+    "$kaiju_bin" -t "$db_nodes" -f "$db_kaiju" -i "$fastq" -o "$kaiju_output" -z 4
+done
+
+# Generar tablas resumen
+summary_dir="${output_dir}/summaries"
+mkdir -p "$summary_dir"
+
+echo "📊 Generando tablas de taxonomía con kaiju2table..."
+for file in "$output_dir"/*_kaiju.out; do
+    [ -e "$file" ] || continue
+    sample=$(basename "$file" _kaiju.out)
+    "$kaiju2table_bin" -t "$db_nodes" -n "$db_names" -r genus -p "$file" -o "${summary_dir}/${sample}_kaiju_summary.txt"
+done
+
+# Concatenar todos los summaries
+cat "${summary_dir}"/*_kaiju_summary.txt > "${summary_dir}/all_kaiju_summary.txt"
+echo "🎯 Pipeline completado para $BEBIDA. Archivo combinado: ${summary_dir}/all_kaiju_summary.txt"
