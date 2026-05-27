@@ -67,6 +67,9 @@ High-quality bins (MAGs) were selected based on 75% completeness
 ## 5. Taxonomic Classification of MAGs
 Taxonomic classification of MAGs using GTDB-Tk.
 
+## 6. Functional annotation
+Decodes the metabolic potential of the high-quality MAGs. Using eggNOG-mapper, proteins predicted from your genomes are annotated to identify specific metabolic pathways and determine what functions each microbe is performing in the beverage ecosystem.
+
 # 📊 R Analysis and Data Visualization
 The R scripts located in scripts_R/ 
 Microbial community composition, diversity, and functional profiles of fermented beverage samples were analyzed using R and multiple bioinformatic tools.
