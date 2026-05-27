@@ -1,0 +1,47 @@
+#!/bin/bash
+# ==========================================
+# PIPELINE 3: METAGENOMIC ASSEMBLY (METASPADES)
+# ==========================================
+
+# --- CONFIGURACIÓN ---
+BEBIDA="pozol"  # <--- ¡CAMBIA AQUÍ LA BEBIDA! (pozol, kefir, kombucha, pulque)
+BASE_DIR="/data2/Alexandra/${BEBIDA}"
+
+TRIMMS="${BASE_DIR}/trimmed_${BEBIDA}"
+OUTDIR="${BASE_DIR}/contigs"
+
+# Ruta de metaspades en el entorno
+METASPADES="/miniconda3/envs/metagenomics/bin/metaspades.py"
+
+# --- EJECUCIÓN ---
+mkdir -p "$OUTDIR"
+total=0; success=0; fail=0
+
+echo "🔍 Buscando archivos trimmed en: $TRIMMS"
+
+for R1 in "$TRIMMS"/*_trimmed.fastq.gz; do
+    if [[ ! -f "$R1" ]]; then
+        echo "⚠️ No se encontraron archivos con el patrón *_trimmed.fastq.gz."
+        continue
+    fi
+    
+    base=$(basename "$R1" _trimmed.fastq.gz)
+    ((total++))
+
+    echo "🔄 Procesando ensamblaje para: $base"
+    OUTPUT="$OUTDIR/assembly_${base}"
+
+    "$METASPADES" -o "$OUTPUT" --only-assembler -s "$R1" --threads 8 --memory 300 
+    
+    if [ $? -eq 0 ] && [ -s "$OUTPUT/contigs.fasta" ]; then
+        echo "✅ Ensamblaje exitoso: $base"
+        ((success++))
+    else
+        echo "❌ Error en ensamblaje: $base"
+        ((fail++))
+    fi
+done
+
+echo "----------------------------------------"
+echo "📊 Resumen Final del Ensamblaje ($BEBIDA):"
+echo "Total de muestras: $total | Éxitos: $success | Fallos: $fail"
