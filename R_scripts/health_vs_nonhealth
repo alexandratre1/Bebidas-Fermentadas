@@ -1,0 +1,98 @@
+# ==============================================================================
+# SCRIPT: TAXONOMIC DISTRIBUTION - HEALTH VS NON-HEALTH (LOG2 TRANSFORMED)
+# ==============================================================================
+
+# --- 1. LIBRERÍAS ---
+library(tidyverse)
+library(patchwork) 
+
+# --- 2. CONFIGURACIÓN DE RUTAS Y METADATOS ---
+RESULTS_DIR <- "./results"
+bebidas     <- c("kefir", "kombucha", "pozol", "pulque")
+
+# Listas de clasificación biológica / funcional
+non_health_list <- c("Acinetobacter", "Clostridioides", "Enterococcus", 
+                     "Gluconobacter", "Klebsiella", "Leuconostoc", 
+                     "Pichia", "Streptococcus")
+
+health_list <- c("Lactobacillus", "Komagataeibacter", "Zymomonas", 
+                 "Lactococcus", "Brettanomyces", "Saccharomyces", 
+                 "Puteibacter", "Lentilactobacillus", "Fructilactobacillus", 
+                 "Gluconacetobacter", "Zygosaccharomyces", "Acetobacter", 
+                 "Exiguobacterium", "Escherichia")
+
+# --- 3. FUNCIÓN DE CARGA GENERALIZADA ---
+cargar_kaiju <- function(bebida) {
+  # Apunta directo a la estructura de la carpeta results
+  file_name <- file.path(RESULTS_DIR, paste0(bebida, "_gkaiju.txt"))
+  
+  if (file.exists(file_name)) {
+    df <- read.table(file_name, sep="\t", header = TRUE, fill = TRUE)
+    df %>% 
+      select(percent, taxon_name) %>% 
+      mutate(bebida = bebida)
+  } else { 
+    message(paste("X No se encontró el archivo:", file_name))
+    NULL 
+  }
+}
+
+# --- 4. PROCESAR Y PREPARAR DATOS ---
+message("📥 Procesando perfiles para análisis de relevancia biológica...")
+df_total <- map_df(bebidas, cargar_kaiju)
+
+if(nrow(df_total) == 0) {
+  stop("❌ Error: No se pudieron cargar los datos de entrada en /results.")
+}
+
+df_total <- df_total %>%
+  mutate(tipo = case_when(
+    taxon_name %in% health_list ~ "Health",
+    taxon_name %in% non_health_list ~ "Non-Health",
+    TRUE ~ NA_character_
+  )) %>%
+  filter(!is.na(tipo)) %>%
+  group_by(bebida, taxon_name, tipo) %>%
+  summarise(percent = sum(as.numeric(percent), na.rm = TRUE), .groups = "drop") %>%
+  # Pseudo-conteo de 0.01 para evitar log2(0) que da -Infinito
+  mutate(log2_abundancia = log2(percent + 0.01))
+
+# --- 5. PANEL 1: HEALTH ---
+p1 <- df_total %>%
+  filter(tipo == "Health") %>%
+  ggplot(aes(x = reorder(taxon_name, log2_abundancia), y = log2_abundancia, fill = bebida)) +
+  geom_bar(stat = "identity", position = position_dodge(preserve = "single"), color = "black", linewidth = 0.2) +
+  coord_flip() +
+  scale_fill_manual(values = c("kefir"="#8dd3c7", "kombucha"="#ffffb3", "pozol"="#bebada", "pulque"="#fb8072")) +
+  theme_bw() +
+  labs(title = "Health-Associated / Probiotic Potential", x = NULL, y = expression(log[2] ~ "Relative Abundance")) +
+  theme(axis.text.y = element_text(face = "italic"), 
+        legend.position = "none",
+        plot.title = element_text(face = "bold", color = "#1b5e20"))
+
+# --- 6. PANEL 2: NON-HEALTH ---
+p2 <- df_total %>%
+  filter(tipo == "Non-Health") %>%
+  ggplot(aes(x = reorder(taxon_name, log2_abundancia), y = log2_abundancia, fill = bebida)) +
+  geom_bar(stat = "identity", position = position_dodge(preserve = "single"), color = "black", linewidth = 0.2) +
+  coord_flip() +
+  scale_fill_manual(values = c("kefir"="#8dd3c7", "kombucha"="#ffffb3", "pozol"="#bebada", "pulque"="#fb8072")) +
+  theme_bw() +
+  labs(title = "Non-Health Associated / Spoilage", x = NULL, y = expression(log[2] ~ "Relative Abundance"), fill = "Beverage") +
+  theme(axis.text.y = element_text(face = "italic"),
+        plot.title = element_text(face = "bold", color = "#b71c1c"))
+
+# --- 7. COMBINACIÓN DE PANELES CON PATCHWORK Y GUARDADO ---
+grafica_final <- p1 + p2 + 
+  plot_annotation(
+    title = 'Taxonomic Distribution: Health vs Non-Health Associated Genera',
+    subtitle = 'Log2-transformed scale to emphasize low-abundance communities',
+    caption = 'Scale calculation: log2(% Relative Abundance + 0.01)',
+    theme = theme(plot.title = element_text(size = 16, face = "bold", hjust = 0.5))
+  )
+
+# Guardar automáticamente en results/ en alta calidad para tesis o artículos
+output_file <- file.path(RESULTS_DIR, "health_vs_nonhealth_log2.png")
+ggsave(output_file, plot = grafica_final, width = 13, height = 7, dpi = 300)
+
+message(paste("✅ Gráfico combinado guardado con éxito en:", output_file))
