@@ -1,0 +1,5 @@
+run_MaxBin.pl \
+-contig assembly/final.contigs.fa \
+-abund abundance.txt \
+-out maxbin2/bin \
+-thread 16
