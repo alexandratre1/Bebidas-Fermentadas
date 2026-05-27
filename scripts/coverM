@@ -1,0 +1,69 @@
+#!/bin/bash
+# ==========================================================
+# PIPELINE: MAG ABUNDANCE PROFILING WITH COVERM
+# ==========================================================
+
+# --- CONFIGURACIÓN DE RUTAS ---
+# --- CONFIGURACIÓN DE RUTAS ---
+BASE_DIR="."
+THREADS=8
+
+# El script buscará tu archivo de MAGs dentro de la carpeta results
+REFERENCE_FASTA="${BASE_DIR}/results/all_mags.fa"
+OUTPUT_DIR="${BASE_DIR}/results/coverm_results"
+
+mkdir -p "$OUTPUT_DIR"
+
+echo "🚀 Iniciando CoverM para evaluar abundancia de MAGs..."
+
+# Ciclo a través de las 4 bebidas fermentadas
+for BEBIDA in pozol pulque kombucha kefir
+do
+    # Busca las carpetas de las bebidas dentro del directorio actual
+    DIR="${BASE_DIR}/${BEBIDA}"
+    
+    # Validar si el directorio existe antes de continuar
+    if [ ! -d "$DIR" ]; then
+        echo "⚠️ Advertencia: No se encontró el directorio $DIR. Saltando..."
+        continue
+    fi
+
+    echo "📊 Procesando muestras de: $BEBIDA"
+
+    # --- CASO 1: Muestras Paired-End (_1 y _2) ---
+    for r1 in "$DIR"/*_1.fastq.gz; do
+        [ -e "$r1" ] || continue
+        r2="${r1/_1.fastq.gz/_2.fastq.gz}"
+
+        if [[ -f "$r2" ]]; then
+            sample=$(basename "$r1" _1.fastq.gz)
+            echo "  🔄 Mapeando pares (PE): $sample"
+
+            coverm contig \
+                --reference "$REFERENCE_FASTA" \
+                --coupled "$r1" "$r2" \
+                --threads $THREADS \
+                --methods relative_abundance \
+                --output-file "${OUTPUT_DIR}/${sample}_coverm.tsv"
+        fi
+    done
+
+    # --- CASO 2: Muestras Single-End ---
+    for r in "$DIR"/*.fastq.gz; do
+        [ -e "$r" ] || continue
+        # Asegurarse de no procesar de nuevo los archivos que son Paired-End
+        if [[ "$r" != *_1.fastq.gz && "$r" != *_2.fastq.gz ]]; then
+            sample=$(basename "$r" .fastq.gz)
+            echo "  🔄 Mapeando lectura única (SE): $sample"
+
+            coverm contig \
+                --reference "$REFERENCE_FASTA" \
+                --single "$r" \
+                --threads $THREADS \
+                --methods relative_abundance \
+                --output-file "${OUTPUT_DIR}/${sample}_coverm.tsv"
+        fi
+    done
+done
+
+echo "✅ Mapeo con CoverM completado. Resultados guardados en: $OUTPUT_DIR"
