@@ -1,0 +1,48 @@
+#!/bin/bash
+# ==========================================================
+# PIPELINE: MAG COMPLETENESS EVALUATION WITH BUSCO
+# ==========================================================
+
+# --- CONFIGURACIÓN DE RUTAS ---
+BASE_DIR="."
+THREADS=16
+
+# Carpeta donde MaxBin2 guardó los archivos .fa de los MAGs
+INPUT_BIN_DIR="${BASE_DIR}/results/maxbin2_bins"
+# Carpeta limpia para los resultados de BUSCO
+OUTPUT_BUSCO_DIR="${BASE_DIR}/results/busco_outputs"
+
+mkdir -p "$OUTPUT_BUSCO_DIR"
+
+echo "🔍 Iniciando evaluación de calidad con BUSCO..."
+
+# Validar si la carpeta de los MAGs existe
+if [ ! -d "$INPUT_BIN_DIR" ]; then
+    echo "❌ Error: No se encontró la carpeta de MAGs en $INPUT_BIN_DIR"
+    exit 1
+fi
+
+# Recorrer cada archivo de MAG (.fa)
+for file in "$INPUT_BIN_DIR"/*.fa; do
+    # Validar si hay archivos disponibles
+    [ -e "$file" ] || continue
+
+    # Obtener el nombre del MAG sin la extensión .fa
+    name=$(basename "$file" .fa)
+    echo "🔄 Evaluando: $name"
+
+    # Moverse temporalmente a la carpeta de salida para que BUSCO no ensucie la raíz
+    cd "$OUTPUT_BUSCO_DIR" || exit
+
+    busco \
+        -i "../maxbin2_bins/$(basename "$file")" \
+        -o "${name}_busco" \
+        -l bacteria_odb10 \
+        -m genome \
+        -c $THREADS
+
+    # Regresar a la raíz del proyecto
+    cd - > /dev/null || exit
+done
+
+echo "✅ Evaluación con BUSCO completada. Reportes guardados en: $OUTPUT_BUSCO_DIR"
