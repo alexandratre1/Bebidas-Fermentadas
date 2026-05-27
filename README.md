@@ -62,13 +62,17 @@ Performs de novo assembly on quality-filtered reads using MetaSPAdes to generate
 Recovery of MAGs using MaxBin2.
 
 ## 4. Downstream Analysis & MAGs
-High-quality bins (MAGs) were selected based on 75% completeness
+High-quality bins (MAGs) were selected based on >5% completeness
+Quality Control (BUSCO) evaluates the completeness and contamination of the recovered bins 
 
 ## 5. Taxonomic Classification of MAGs
 Taxonomic classification of MAGs using GTDB-Tk.
 
-## 6. Functional annotation
-Decodes the metabolic potential of the high-quality MAGs. Using eggNOG-mapper, proteins predicted from your genomes are annotated to identify specific metabolic pathways and determine what functions each microbe is performing in the beverage ecosystem.
+## 6. MAG Abundances Profile (`scripts/run_coverm.sh`)
+Calculate the real relative abundance of each recovered MAG across all samples. Using CoverM, raw reads are mapped back to the consolidated MAGs database.
+
+## 7. Functional annotation
+Decodes the metabolic potential of the high-quality MAGs. Using eggNOG-mapper, proteins predicted from your genomes are annotated.
 
 # 📊 R Analysis and Data Visualization
 The R scripts located in scripts_R/ 
