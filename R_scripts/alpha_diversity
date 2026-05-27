@@ -1,0 +1,111 @@
+# ==============================================================================
+# SCRIPT: ALPHA DIVERSITY METRICS (RICHNESS, SHANNON, SIMPSON)
+# ==============================================================================
+
+# 0. Limpieza y carga de librerías
+if(!is.null(dev.list())) dev.off()
+rm(list = ls())
+library(tidyverse)
+library(vegan)
+library(RColorBrewer)
+
+# --- 1. CONFIGURACIÓN DE RUTAS RELATIVAS ---
+RESULTS_DIR <- "./results"
+OUTPUT_PDF  <- file.path(RESULTS_DIR, "Diversidad_Alfa_Bebidas.pdf")
+
+# Vector de archivos apuntando internamente a los perfiles de la carpeta results
+archivos <- c(
+  file.path(RESULTS_DIR, "kefir_gkaiju.txt"),
+  file.path(RESULTS_DIR, "kombucha_gkaiju.txt"), 
+  file.path(RESULTS_DIR, "pozol_gkaiju.txt"), 
+  file.path(RESULTS_DIR, "pulque_gkaiju.txt")
+)
+nombres_bebidas <- c("Kefir", "Kombucha", "Pozol", "Pulque")
+
+# --- 2. FUNCIÓN ROBUSTA DE LECTURA ---
+leer_datos_kaiju <- function(ruta, nombre_bebida) {
+  if(!file.exists(ruta)) {
+    message(paste("X Archivo no encontrado:", ruta))
+    return(NULL)
+  }
+  
+  df <- read.delim(ruta, header = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
+  colnames(df) <- tolower(trimws(colnames(df)))
+  
+  df %>%
+    select(sample, percent, taxon_name) %>%
+    mutate(percent = as.numeric(percent)) %>%
+    filter(!is.na(percent), percent > 0) %>%
+    filter(!grepl("unclassified|cannot|cellular organisms", taxon_name, ignore.case = TRUE)) %>%
+    mutate(Bebida = nombre_bebida) %>%
+    rename(Sample = sample)
+}
+
+# --- 3. PROCESAMIENTO Y MATRIZ DE COMUNIDAD (TIPO VEGAN) ---
+message("📥 Cargando perfiles para ecología de comunidades...")
+datos_completos <- map2_df(archivos, nombres_bebidas, leer_datos_kaiju)
+
+if(nrow(datos_completos) == 0) {
+  stop("❌ Error: No se encontraron los datos de entrada en /results.")
+}
+
+comunidad_matriz <- datos_completos %>%
+  group_by(Sample, Bebida, taxon_name) %>%
+  summarise(percent = sum(percent), .groups = "drop") %>%
+  pivot_wider(names_from = taxon_name, values_from = percent, values_fill = 0)
+
+metadata     <- comunidad_matriz %>% select(Sample, Bebida)
+matriz_vegan <- comunidad_matriz %>% select(-Sample, -Bebida)
+
+# --- 4. CÁCULO DE DIVERSIDAD ALFA ---
+message("🧮 Calculando índices: Riqueza, Shannon y Simpson...")
+resultados_alfa <- data.frame(
+  Sample  = metadata$Sample,
+  Bebida  = metadata$Bebida,
+  Richness = specnumber(matriz_vegan),
+  Shannon  = diversity(matriz_vegan, index = "shannon"),
+  Simpson  = diversity(matriz_vegan, index = "simpson")
+)
+
+# Convertir a formato largo para el facet_wrap
+resultados_largo <- resultados_alfa %>%
+  pivot_longer(cols = c(Richness, Shannon, Simpson), 
+               names_to = "Index", values_to = "Value") %>%
+  mutate(Index = factor(Index, levels = c("Richness", "Shannon", "Simpson")))
+
+# ==============================================================================
+# 5. CONFIGURACIÓN DE CAPAS COMO LISTA (HACK ANTI-ERROR S7)
+# ==============================================================================
+capas_alfa <- list(
+  geom_boxplot(outlier.shape = NA, alpha = 0.6, width = 0.5),
+  geom_jitter(width = 0.15, size = 2.5, shape = 21, color = "black", alpha = 0.8),
+  facet_wrap(~ Index, scales = "free_y", ncol = 3),
+  scale_fill_brewer(palette = "Set2"),
+  theme_bw(),
+  labs(
+    title = "Alpha Diversity Across Fermented Beverages",
+    subtitle = "Metagenomic comparison of Richness, Shannon, and Simpson indices",
+    x = NULL, y = "Index Value"
+  ),
+  theme(
+    strip.text = element_text(face = "bold", size = 12),
+    strip.background = element_rect(fill = "#f5f5f5", color = "#d3d3d3"),
+    plot.title = element_text(face = "bold", size = 15, hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    panel.grid.minor = element_blank(),
+    legend.position = "none"
+  )
+)
+
+# --- 6. RENDERIZADO Y GUARDADO DEL PDF ---
+message("🎨 Dibujando boxplots filogenéticos...")
+pdf(OUTPUT_PDF, width = 11, height = 6)
+
+# Construir el gráfico uniendo la estética base con la lista protectora
+p_alfa <- ggplot(resultados_largo, aes(x = Bebida, y = Value, fill = Bebida)) + capas_alfa
+print(p_alfa)
+
+# Cerrar de manera limpia el dispositivo PDF
+dev.off()
+
+message(paste("✅ ¡Pipeline de diversidad alfa terminado! Archivo guardado en:", OUTPUT_PDF))
