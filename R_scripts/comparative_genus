@@ -1,0 +1,105 @@
+# ==============================================================================
+# SCRIPT: COMPARATIVE GENUS-LEVEL PROFILE (FACETED & SERVER-SAFE)
+# ==============================================================================
+
+# 0. Limpieza de motor gráfico para evitar el "Graphics API mismatch"
+if(!is.null(dev.list())) dev.off()
+
+library(tidyverse)
+library(RColorBrewer)
+
+# --- 1. CONFIGURACIÓN DE RUTAS RELATIVAS ---
+RESULTS_DIR <- "./results"
+OUTPUT_PDF  <- file.path(RESULTS_DIR, "Resultado_Metagenomica_Bebidas.pdf")
+
+# Vector de archivos apuntando de forma interna a la carpeta results
+archivos <- c(
+  file.path(RESULTS_DIR, "kefir_gkaiju.txt"),
+  file.path(RESULTS_DIR, "kombucha_gkaiju.txt"), 
+  file.path(RESULTS_DIR, "pozol_gkaiju.txt"), 
+  file.path(RESULTS_DIR, "pulque_gkaiju.txt")
+)
+nombres_bebidas <- c("Kefir", "Kombucha", "Pozol", "Pulque")
+
+# --- 2. FUNCIÓN DE LECTURA FILTRADA ---
+leer_generos_kaiju <- function(ruta, nombre_bebida) {
+  if(!file.exists(ruta)) {
+    message(paste("X Archivo no encontrado:", ruta))
+    return(NULL)
+  }
+  
+  df <- read.delim(ruta, header = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
+  colnames(df) <- tolower(trimws(colnames(df)))
+  
+  df %>%
+    select(sample, percent, taxon_name) %>%
+    mutate(percent = as.numeric(percent)) %>%
+    filter(!is.na(percent), percent > 0.1) %>% 
+    filter(!grepl("unclassified|cannot|cellular organisms|non-viral", taxon_name, ignore.case = TRUE)) %>%
+    mutate(Bebida = nombre_bebida) %>%
+    rename(Sample = sample, Genero = taxon_name)
+}
+
+# --- 3. PROCESAR Y UNIFICAR DATOS ---
+message("📥 Cargando y unificando perfiles taxonómicos...")
+datos_genero <- map2_df(archivos, nombres_bebidas, leer_generos_kaiju)
+
+if(nrow(datos_genero) == 0) {
+  stop("❌ Error: No se pudieron cargar los datos. Revisa que las tablas Kaiju estén en /results.")
+}
+
+# --- 4. SELECCIÓN DEL TOP 15 DE GÉNEROS ---
+top_generos <- datos_genero %>%
+  group_by(Genero) %>%
+  summarise(total = sum(percent)) %>%
+  arrange(desc(total)) %>%
+  head(15) %>%
+  pull(Genero)
+
+datos_plot <- datos_genero %>%
+  mutate(Genero_Final = if_else(Genero %in% top_generos, Genero, "Otros")) %>%
+  mutate(Genero_Final = factor(Genero_Final, levels = c(sort(top_generos), "Otros"))) %>%
+  group_by(Sample, Bebida, Genero_Final) %>%
+  summarise(Abundancia = sum(percent), .groups = "drop")
+
+# --- 5. CONFIGURACIÓN DE PALETA CROMÁTICA ---
+palette_colores <- c(colorRampPalette(brewer.pal(12, "Paired"))(length(unique(datos_plot$Genero_Final)) - 1), "#D3D3D3")
+
+# ==============================================================================
+# 6. CONFIGURACIÓN DE CAPAS COMO LISTA (HACK ANTI-ERROR S7)
+# ==============================================================================
+capas_grafico <- list(
+  geom_bar(stat = "identity", position = "fill", width = 0.9),
+  facet_grid(. ~ Bebida, scales = "free_x", space = "free_x"),
+  scale_y_continuous(labels = scales::percent, expand = c(0,0)),
+  scale_fill_manual(values = palette_colores),
+  theme_minimal(),
+  labs(
+    title = "Microbial Community Composition at Genus Level",
+    subtitle = "Relative abundance > 0.1% grouped by fermented beverage (Metagenomics)",
+    x = "Samples (SRR Run)", y = "Relative Abundance (%)", fill = "Genus"
+  ),
+  theme(
+    axis.text.x = element_blank(), 
+    panel.spacing = unit(0.4, "lines"),
+    strip.text = element_text(face = "bold", size = 11),
+    strip.background = element_rect(fill = "#f0f0f0", color = NA),
+    legend.position = "right",
+    legend.text = element_text(face = "italic", size = 8),
+    panel.grid = element_blank(),
+    plot.title = element_text(face = "bold", size = 14)
+  )
+)
+
+# --- 7. RENDERIZADO Y GUARDADO DEL PDF ---
+message("🎨 Renderizando mega-gráfico comparativo...")
+pdf(OUTPUT_PDF, width = 12, height = 7)
+
+# Construir el objeto base y sumarle la lista protectora
+p <- ggplot(datos_plot, aes(x = Sample, y = Abundancia, fill = Genero_Final)) + capas_grafico
+print(p)
+
+# Cerrar el dispositivo gráfico de forma segura
+dev.off()
+
+message(paste("✅ ¡Completado! El mega panel comparativo se guardó en:", OUTPUT_PDF))
