@@ -81,6 +81,7 @@ Utilize tidyverse and ggplot2 to process taxonomic tables and generate plots.
  If you don't have ggplot2 installed, you can install it in an R session with:
 ```r
 install.packages("ggplot2")
+install.packages("vegan")
 install.packages("tidyverse")
 ```
 The analyses included:
