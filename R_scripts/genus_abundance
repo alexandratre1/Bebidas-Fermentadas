@@ -1,0 +1,98 @@
+# ==============================================================================
+# SCRIPT: TAXONOMIC COMPOSITION AT GENUS LEVEL (> 0.1%)
+# ==============================================================================
+
+# --- 1. LIBRERÍAS ---
+library(tidyverse)
+library(RColorBrewer)
+
+# --- 2. CONFIGURACIÓN DE RUTAS RELATIVAS ---
+RESULTS_DIR <- "./results"
+
+# Lista de archivos de géneros mapeados a la carpeta results
+files_genero <- list(
+  Kefir    = file.path(RESULTS_DIR, "kefir_gkaiju.txt"),
+  Kombucha = file.path(RESULTS_DIR, "kombucha_gkaiju.txt"), 
+  Pozol    = file.path(RESULTS_DIR, "pozol_gkaiju.txt"), 
+  Pulque   = file.path(RESULTS_DIR, "pulque_gkaiju.txt")
+)
+
+# --- 3. FUNCIÓN DE LECTURA FILTRADA ---
+leer_kaiju_filtrado <- function(ruta) {
+  if (!file.exists(ruta)) {
+    message(paste("X No se encuentra el archivo:", ruta))
+    return(NULL)
+  }
+  
+  df <- read.table(ruta, header = TRUE, sep = "\t", stringsAsFactors = FALSE, check.names = FALSE)
+  colnames(df) <- tolower(trimws(colnames(df)))
+  
+  df_clean <- df %>%
+    select(sample, percent, taxon_name) %>%
+    mutate(percent = as.numeric(percent)) %>%
+    filter(!is.na(percent), percent > 0.1) %>% 
+    filter(!grepl("unclassified|cannot|cellular organisms|non-viral", taxon_name, ignore.case = TRUE)) %>%
+    rename(Sample = sample, Genero = taxon_name)
+  
+  return(df_clean)
+}
+
+# --- 4. GENERAR, MOSTRAR Y GUARDAR LOS GRÁFICOS ---
+message("--- Generando gráficos a nivel Género y guardando en /results ---")
+
+for (nombre in names(files_genero)) {
+  
+  datos_bebida <- leer_kaiju_filtrado(files_genero[[nombre]])
+  
+  if (is.null(datos_bebida) || nrow(datos_bebida) == 0) next
+  
+  # Identificar el Top 15 de géneros
+  top_generos <- datos_bebida %>%
+    group_by(Genero) %>%
+    summarise(total = sum(percent)) %>%
+    arrange(desc(total)) %>%
+    head(15) %>%
+    pull(Genero)
+  
+  # Preparar datos para el gráfico
+  datos_plot <- datos_bebida %>%
+    mutate(Genero_Final = if_else(Genero %in% top_generos, Genero, "Otros")) %>%
+    group_by(Sample, Genero_Final) %>%
+    summarise(Abundancia = sum(percent), .groups = "drop") %>%
+    mutate(Genero_Final = factor(Genero_Final, levels = c(sort(top_generos), "Otros")))
+  
+  # Definir colores (Pasteles Set3 para los géneros + Gris claro para "Otros")
+  n_gen <- length(levels(datos_plot$Genero_Final))
+  colores_plot <- c(colorRampPalette(brewer.pal(12, "Set3"))(n_gen - 1), "#D3D3D3")
+  
+  # Crear el gráfico de ggplot
+  p <- ggplot(datos_plot, aes(x = Sample, y = Abundancia, fill = Genero_Final)) +
+    geom_bar(stat = "identity", position = "fill", width = 0.9) +
+    scale_y_continuous(labels = scales::percent, expand = c(0,0)) +
+    scale_fill_manual(values = colores_plot, drop = TRUE) +
+    theme_minimal() +
+    labs(
+      title = paste("Taxonomic Composition:", nombre),
+      subtitle = "Genera with Relative Abundance > 0.1%",
+      x = "Samples (SRR Run)",
+      y = "Relative Abundance (%)",
+      fill = "Genus"
+    ) +
+    theme(
+      axis.text.x = element_text(angle = 90, vjust = 0.5, size = 8),
+      panel.grid = element_blank(),
+      legend.position = "right",
+      plot.title = element_text(face = "bold", size = 14)
+    )
+  
+  # 1. Mostrar en pantalla en RStudio
+  print(p)
+  
+  # 2. Guardado automático en formato PNG seguro
+  output_name <- paste0("genus_abundance_", tolower(nombre), "_0.1.png")
+  ggsave(file.path(RESULTS_DIR, output_name), plot = p, width = 7, height = 9, dpi = 300, device = "png")
+  
+  message(paste("V Gráfico de", nombre, "guardado con éxito como:", output_name))
+}
+
+message("--- ¡Pipeline de R completado al 100%! ---")
