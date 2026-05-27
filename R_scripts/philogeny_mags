@@ -1,0 +1,86 @@
+# ==============================================================================
+# SCRIPT: PHYLOGENETIC TREE VISUALIZATION FOR MAGS (GGTREE)
+# ==============================================================================
+
+# 0. Limpieza de motor gráfico
+if(!is.null(dev.list())) dev.off()
+
+# --- 1. LIBRERÍAS ---
+library(tidyverse)
+library(ggtree)
+library(treeio)
+library(ape)
+
+# --- 2. CONFIGURACIÓN DE RUTAS ---
+RESULTS_DIR <- "./results"
+
+# --- 3. FUNCIÓN MAESTRA FILOGENÉTICA ---
+generar_arbol_bebida <- function(nombre_bebida) {
+  message(paste("\n🌳 Procesando filogenia para:", toupper(nombre_bebida)))
+  
+  # Definir rutas de entrada basadas en la estructura del proyecto
+  # Nota: Ajusta los nombres de tus archivos .tree si varían un poco
+  tree_file <- file.path(RESULTS_DIR, paste0("gtdbtk_", tolower(nombre_bebida), ".tree"))
+  tax_file  <- file.path(RESULTS_DIR, paste0(tolower(nombre_bebida), "_mags_fijo.txt"))
+  
+  # Validar que existan ambos archivos esenciales
+  if (!file.exists(tree_file) || !file.exists(tax_file)) {
+    message(paste("X Saltando", nombre_bebida, "- Faltan archivos .tree o de metadatos en /results"))
+    return(NULL)
+  }
+  
+  # Cargar árbol y metadatos
+  tree         <- read.tree(tree_file)
+  metadata_raw <- read.table(tax_file, header = TRUE, sep = "\t", fill = TRUE, check.names = FALSE)
+  
+  # 3.1 Crear tabla limpia para acoplar al árbol (Evita duplicados)
+  # Buscamos columnas clave: Genoma, Especie_Completa (o lo que use tu tabla para especie) y Genero
+  metadata_final <- data.frame(
+    label   = metadata_raw$Genoma,
+    Especie = metadata_raw$Especie_Completa,
+    Genero  = metadata_raw$Genero
+  )
+  
+  # 3.2 Podar el árbol para dejar solo las puntas que corresponden a tus MAGs
+  mis_puntas    <- tree$tip.label[tree$tip.label %in% metadata_final$label]
+  
+  if(length(mis_puntas) == 0) {
+    message("X Error: Las etiquetas del árbol no coinciden con la columna Genoma de tus metadatos.")
+    return(NULL)
+  }
+  
+  tree_reducido <- keep.tip(tree, mis_puntas)
+  
+  # 3.3 Construcción del gráfico con ggtree
+  # El operador %<+% inyecta de forma segura tu dataframe al objeto del árbol
+  p <- ggtree(tree_reducido, layout = "rectangular") %<+% metadata_final + 
+    geom_tippoint(aes(color = Genero), size = 3) + 
+    geom_tiplab(aes(label = Especie), size = 3.5, fontface = "italic", offset = 0.01) + 
+    geom_treescale() +
+    theme_tree2() +
+    xlim(0, 3.0) + # Espacio suficiente a la derecha para que no se corten los nombres de las especies
+    labs(
+      title = paste("Phylogeny of Metagenome-Assembled Genomes (MAGs)"),
+      subtitle = paste("Matrix source:", tools::toTitleCase(nombre_bebida)),
+      color = "Microbial Genus"
+    ) +
+    theme(
+      legend.position = "right",
+      plot.title = element_text(face = "bold", size = 14),
+      legend.text = element_text(face = "italic")
+    )
+  
+  # Imprimir en la pestaña de Plots de RStudio
+  print(p)
+  
+  # 3.4 Guardado automático en formato PDF de alta definición (ideal para vectores de árboles)
+  output_pdf <- file.path(RESULTS_DIR, paste0("phylogeny_mags_", tolower(nombre_bebida), ".pdf"))
+  ggsave(output_pdf, plot = p, width = 11, height = 8.5, device = "pdf")
+  
+  message(paste("✅ ¡Árbol filogenético guardado con éxito en:", output_pdf))
+}
+
+# --- 4. EJECUCIÓN AUTOMÁTICA ---
+# El script intentará correr y generar los árboles de tus 4 bebidas en una sola pasada
+bebidas_estudio <- c("kefir", "kombucha", "pozol", "pulque")
+walk(bebidas_estudio, generar_arbol_bebida)
