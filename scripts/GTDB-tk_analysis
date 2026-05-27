@@ -1,0 +1,5 @@
+gtdbtk classify_wf \
+--genome_dir maxbin2/ \
+--extension fa \
+--out_dir gtdbtk_output \
+--cpus 16
