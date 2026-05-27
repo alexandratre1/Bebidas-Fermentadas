@@ -1,0 +1,31 @@
+#!/bin/bash
+# ==========================================================
+# PIPELINE: FUNCTIONAL ANNOTATION WITH EGGNOG-MAPPER
+# ==========================================================
+
+# --- CONFIGURACIÓN DE RUTAS ---
+BASE_DIR="."
+THREADS=16
+
+# Archivo FASTA de aminoácidos (.faa) con las proteínas predichas de tus MAGs
+INPUT_PROTEINS="${BASE_DIR}/results/all_mags.faa"
+# Carpeta de salida para las tablas funcionales
+OUTPUT_DIR="${BASE_DIR}/results/eggnog_output"
+
+mkdir -p "$OUTPUT_DIR"
+
+echo "🍄 Iniciando anotación funcional con eggNOG-mapper..."
+
+# Validar si el archivo de proteínas existe
+if [ ! -f "$INPUT_PROTEINS" ]; then
+    echo "❌ Error: No se encontró el archivo de proteínas en $INPUT_PROTEINS"
+    exit 1
+fi
+
+# Ejecutar eggNOG-mapper
+emapper.py \
+    -i "$INPUT_PROTEINS" \
+    -o "${OUTPUT_DIR}/eggnog_functional_annotation" \
+    --cpu $THREADS
+
+echo "✅ Anotación funcional completada. Resultados guardados en: $OUTPUT_DIR"
