@@ -61,12 +61,28 @@ Performs de novo assembly on quality-filtered reads using MetaSPAdes to generate
 ## 4. Genome Binning
 Recovery of MAGs using MaxBin2.
 
+```bash
+run_MaxBin.pl \
+-contig assembly/final.contigs.fa \
+-abund abundance.txt \
+-out maxbin2/bin \
+-thread 16
+```
+
 ## 4. Downstream Analysis & MAGs
 High-quality bins (MAGs) were selected based on >5% completeness
 Quality Control (BUSCO) evaluates the completeness and contamination of the recovered bins 
 
 ## 5. Taxonomic Classification of MAGs
 Taxonomic classification of MAGs using GTDB-Tk.
+
+```bash
+gtdbtk classify_wf \
+--genome_dir maxbin2/ \
+--extension fa \
+--out_dir gtdbtk_output \
+--cpus 16
+```
 
 ## 6. MAG Abundances Profile (`scripts/run_coverm.sh`)
 Calculate the real relative abundance of each recovered MAG across all samples. Using CoverM, raw reads are mapped back to the consolidated MAGs database.
