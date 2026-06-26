@@ -1,0 +1,129 @@
+library(tidyverse)
+library(vegan)
+library(uwot)
+
+ruta <- path.expand("~/bebidas")
+
+archivos <- c(
+  kombucha = file.path(ruta, "kombucha_gkaiju.txt"),
+  kefir    = file.path(ruta, "kefir_gkaiju.txt"),
+  pozol    = file.path(ruta, "pozol_gkaiju.txt"),
+  pulque   = file.path(ruta, "pulque_gkaiju.txt")
+)
+
+leer_gkaiju <- function(file, bebida) {
+  read_tsv(
+    file,
+    show_col_types = FALSE,
+    progress = FALSE,
+    trim_ws = TRUE,
+    name_repair = "minimal"
+  ) %>%
+    select(1:5) %>%
+    setNames(c("sample", "percent", "reads", "taxon_id", "taxon_name")) %>%
+    mutate(
+      bebida = bebida,
+      sample = as.character(sample),
+      taxon_name = as.character(taxon_name)
+    ) %>%
+    filter(
+      !is.na(sample),
+      !is.na(taxon_name),
+      taxon_name != ""
+    )
+}
+
+datos <- purrr::imap_dfr(archivos, leer_gkaiju)
+
+# Ver cuántas muestras hay por bebida
+print(
+  datos %>%
+    count(bebida, sample, sort = TRUE)
+)
+
+# Matriz muestra x género
+matriz <- datos %>%
+  group_by(sample, bebida, taxon_name) %>%
+  summarise(percent = sum(percent), .groups = "drop") %>%
+  pivot_wider(
+    names_from = taxon_name,
+    values_from = percent,
+    values_fill = 0
+  )
+
+metadata <- matriz %>%
+  select(sample, bebida)
+
+matriz_abund <- matriz %>%
+  select(-sample, -bebida) %>%
+  as.data.frame()
+
+rownames(matriz_abund) <- paste(metadata$bebida, metadata$sample, sep = "_")
+
+# Abundancia relativa
+matriz_rel <- decostand(matriz_abund, method = "total")
+
+# UMAP con Bray-Curtis
+if (!requireNamespace("rnndescent", quietly = TRUE)) {
+  install.packages("rnndescent")
+}
+
+k <- min(5, nrow(matriz_rel) - 1)
+
+set.seed(42)
+umap_res <- uwot::umap(
+  matriz_rel,
+  metric = "braycurtis",
+  nn_method = "nndescent",
+  n_neighbors = k,
+  min_dist = 0.2,
+  verbose = TRUE
+)
+
+umap_df <- data.frame(
+  UMAP1 = umap_res[, 1],
+  UMAP2 = umap_res[, 2],
+  sample = metadata$sample,
+  bebida = metadata$bebida
+)
+
+# Guardar figura en PDF
+pdf(
+  file.path(ruta, "umap_beta_diversity.pdf"),
+  width = 10,
+  height = 6
+)
+
+# dejar margen derecho extra para la leyenda
+par(mar = c(5, 5, 4, 10), xpd = TRUE)
+
+cols <- c(
+  kombucha = "steelblue",
+  kefir = "darkgreen",
+  pozol = "orange",
+  pulque = "firebrick"
+)
+
+plot(
+  umap_df$UMAP1,
+  umap_df$UMAP2,
+  col = cols[umap_df$bebida],
+  pch = 19,
+  cex = 1.5,
+  xlab = "UMAP1",
+  ylab = "UMAP2",
+  main = "UMAP of Beta Diversity"
+)
+
+legend(
+  "topright",
+  inset = c(-0.25, 0),
+  legend = c("Kombucha", "Kefir", "Pozol", "Pulque"),
+  col = cols,
+  pch = 19,
+  pt.cex = 1.5,
+  bty = "n",
+  title = "Beverage"
+)
+
+dev.off()
