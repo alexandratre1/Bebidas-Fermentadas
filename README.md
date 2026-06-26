@@ -143,14 +143,58 @@ install.packages("vegan")
 install.packages("tidyverse")
 ```
 The analyses included:
-- Taxonomic Analysis
-- Alpha Diversity
-- Beta Diversity
-- Functional Analysis
-- Genome Quality Assessment
-- Comparative and Visualization Analyses
+### Taxonomic Analysis
+Taxonomic profiles were processed to compare microbial community composition across fermented beverages at the genus level. Low-abundance taxa were filtered using a relative abundance threshold of >0.1%, and non-informative assignments such as unclassified or cellular organism labels were excluded to emphasize biologically relevant taxa. 
 
-Example: 
+- Taxonomic Intersections
+```bash
+R_scripts/upset_venn
+```
+- Genus-Level Taxonomic Composition
+```bash
+R_scripts/genus_abundance
+R_scripts/family_abundance
+```
+- Comparative Genus-Level Profile
+```bash
+R_scripts/comparative_genus
+```
+### Alpha Diversity
+```bash
+R_scripts/alpha_diversity
+```
+Community richness and diversity were summarized using three standard ecological indices: species richness, Shannon diversity, and Simpson diversity. The analysis was performed on genus-level abundance tables after filtering low-quality and non-informative taxonomic assignments.
+
+ ### Beta Diversity
+ ```bash
+R_scripts/BetaD_NMDS
+R_scripts/Umap_BD
+```
+Beta diversity was assessed using Bray-Curtis dissimilarity on genus-level abundance tables to compare microbial community structure across fermented beverages. Ordination and clustering approaches were used to visualize differences among samples, including UMAP and NMDS-based representations.
+
+### Functional Analysis
+ ```bash
+R_scripts/BGCs_istribution_heatmap
+```
+Functional profiles were explored to characterize the metabolic potential of microbial communities and recovered MAGs. Biosynthetic gene clusters (BGCs) identified with antiSMASH were summarized to compare the distribution of specialized metabolite pathways among fermented beverages.
+
+### MAG Characterization 
+ ```bash
+R_scripts/philogeny_mags
+```
+Visualizes the phylogenetic placement of metagenome-assembled genomes (MAGs) using GTDB-Tk trees and `ggtree`. The script overlays taxonomic metadata onto the tree, colors tips by genus, and labels MAGs by species to summarize their evolutionary relationships across fermented beverages.
+
+### Comparative and Visualization Analyses
+- Integrated Metagenomic Comparison
+Integrates MAG taxonomic distribution, BUSCO quality metrics, functional gene abundance, and genus-level intersections into a comparative visualization across fermented beverages.
+ ```bash
+R_scripts/health_vs_nonhealth
+```
+- Health vs Non-Health Associated Taxa 
+Compares the relative abundance of taxa associated with health-related and non-health-related profiles across fermented beverages using log2-transformed abundance values to emphasize low-abundance genera.
+ ```bash
+R_scripts/BUSCO_TaxDis_Func_G
+```
 
 <p align="center">
   <img width="850" alt="Relative Abundance Analysis" src="https://github.com/user-attachments/assets/a91006ae-5685-4abd-8af8-76bac123b1ee" />
