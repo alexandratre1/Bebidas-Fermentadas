@@ -186,11 +186,13 @@ Visualizes the phylogenetic placement of metagenome-assembled genomes (MAGs) usi
 
 ### Comparative and Visualization Analyses
 - Integrated Metagenomic Comparison
+
 Integrates MAG taxonomic distribution, BUSCO quality metrics, functional gene abundance, and genus-level intersections into a comparative visualization across fermented beverages.
  ```bash
 R_scripts/health_vs_nonhealth
 ```
-- Health vs Non-Health Associated Taxa 
+- Health vs Non-Health Associated Taxa
+
 Compares the relative abundance of taxa associated with health-related and non-health-related profiles across fermented beverages using log2-transformed abundance values to emphasize low-abundance genera.
  ```bash
 R_scripts/BUSCO_TaxDis_Func_G
