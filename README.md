@@ -74,9 +74,15 @@ Processes raw Single-End (SE) and Paired-End .fastq.gz reads to remove low-quali
 Key parameters: SLIDINGWINDOW:4:20 MINLEN:50
 
 ## 2. Taxonomic Classification
+```bash
+scripts/taxonomic_analysis
+```
 Assigns taxonomic reads using Kaiju against the NCBI nr_euk database to identify both bacterial and eukaryotic communities.
 
 ## 3. Metagenomic Assembly
+```bash
+scripts/mags_assembly
+```
 Performs de novo assembly on quality-filtered reads using MetaSPAdes to generate contigs for downstream binning.
 
 ## 4. Genome Binning
@@ -91,6 +97,9 @@ run_MaxBin.pl \
 ```
 
 ## 4. Downstream Analysis & MAGs
+```bash
+scripts/BUSCO
+```
 High-quality bins (MAGs) were selected based on >5% completeness
 Quality Control (BUSCO) evaluates the completeness and contamination of the recovered bins 
 
@@ -109,7 +118,16 @@ gtdbtk classify_wf \
 Calculate the real relative abundance of each recovered MAG across all samples. Using CoverM, raw reads are mapped back to the consolidated MAGs database.
 
 ## 7. Functional annotation
+```bash
+scripts/cover_M
+```
 Decodes the metabolic potential of the high-quality MAGs. Using eggNOG-mapper, proteins predicted from your genomes are annotated.
+
+## 8. Genome-Scale Metabolic Modeling
+```bash
+scripts/01_carveme_reconstruction.sh
+```
+Runs CarveMe on each MAG nucleotide FASTA to reconstruct genome-scale metabolic models (GEMs) in BiGG namespace using Diamond for functional annotation. Output: one .xml SBML file per genome.
 
 # 📊 R Analysis and Data Visualization
 The R scripts located in scripts_R/ 
