@@ -1,0 +1,177 @@
+###########################################
+###     BETA DIVERSITY ANALYSIS         ###
+###   Bray-Curtis + Clustering + NMDS   ###
+###########################################
+
+library(tidyverse)
+library(vegan)
+
+###########################################
+### 1. Rutas de archivos + nombres
+###########################################
+
+archivos <- c(
+  Pulque   = "~/bebidas/pulque_gkaiju.txt",
+  Kefir    = "~/bebidas/kefir_gkaiju.txt",
+  Kombucha = "~/bebidas/kombucha_gkaiju.txt",
+  Pozol    = "~/bebidas/pozol_gkaiju.txt"
+)
+
+###########################################
+### 2. Función para leer archivos Kaiju
+###########################################
+
+leer_kaiju <- function(ruta, nombre_bebida) {
+  if (!file.exists(ruta)) {
+    message("Archivo no encontrado: ", ruta)
+    return(NULL)
+  }
+
+  df <- read_tsv(
+    ruta,
+    show_col_types = FALSE,
+    progress = FALSE,
+    trim_ws = TRUE,
+    name_repair = "minimal"
+  )
+
+  colnames(df) <- tolower(trimws(colnames(df)))
+
+  df %>%
+    select(sample, percent, taxon_name) %>%
+    mutate(
+      sample = as.character(sample),
+      percent = as.numeric(percent),
+      taxon_name = as.character(taxon_name),
+      bebida = nombre_bebida
+    ) %>%
+    filter(
+      !is.na(sample),
+      !is.na(taxon_name),
+      taxon_name != "",
+      !is.na(percent),
+      percent > 0
+    ) %>%
+    filter(!grepl("unclassified|cannot|cellular organisms|non-viral", taxon_name, ignore.case = TRUE))
+}
+
+###########################################
+### 3. Leer y combinar todos los archivos
+###########################################
+
+datos <- purrr::imap_dfr(archivos, leer_kaiju)
+
+if (nrow(datos) == 0) {
+  stop("No se pudieron cargar datos para beta diversidad.")
+}
+
+###########################################
+### 4. Matriz muestra x taxón
+###########################################
+
+tabla_beta <- datos %>%
+  group_by(sample, bebida, taxon_name) %>%
+  summarise(abundancia = sum(percent), .groups = "drop") %>%
+  pivot_wider(
+    names_from = taxon_name,
+    values_from = abundancia,
+    values_fill = 0
+  )
+
+metadata <- tabla_beta %>%
+  select(sample, bebida)
+
+matriz_beta <- tabla_beta %>%
+  select(-sample, -bebida) %>%
+  as.data.frame()
+
+rownames(matriz_beta) <- paste(metadata$bebida, metadata$sample, sep = "_")
+
+###########################################
+### 5. Abundancia relativa
+###########################################
+
+matriz_rel <- decostand(matriz_beta, method = "total")
+
+###########################################
+### 6. Bray-Curtis distance
+###########################################
+
+dist_beta <- vegdist(matriz_rel, method = "bray")
+
+###########################################
+### 7. Clustering jerárquico
+###########################################
+
+cluster <- hclust(dist_beta, method = "ward.D2")
+
+pdf("~/bebidas/beta_diversity_cluster.pdf", width = 8, height = 6)
+
+plot(
+  cluster,
+  main = "Hierarchical clustering based on Bray-Curtis dissimilarity",
+  xlab = "Fermented beverage samples",
+  ylab = "Bray-Curtis distance"
+)
+
+dev.off()
+
+###########################################
+### 8. NMDS
+###########################################
+
+set.seed(42)
+nmds <- metaMDS(dist_beta, trymax = 50, autotransform = FALSE)
+
+nmds_scores <- as.data.frame(scores(nmds, display = "sites"))
+nmds_scores$sample <- rownames(nmds_scores)
+nmds_scores <- nmds_scores %>%
+  separate(sample, into = c("bebida", "sample"), sep = "_", extra = "merge")
+
+colores <- c(
+  "Pulque" = "red",
+  "Kefir" = "darkblue",
+  "Kombucha" = "darkgreen",
+  "Pozol" = "orange"
+)
+
+pdf("~/bebidas/beta_diversity_nmds.pdf", width = 8, height = 6)
+
+plot(
+  nmds_scores$NMDS1,
+  nmds_scores$NMDS2,
+  type = "n",
+  main = "NMDS of Beta Diversity (Bray-Curtis)",
+  xlab = "NMDS1",
+  ylab = "NMDS2"
+)
+
+points(
+  nmds_scores$NMDS1,
+  nmds_scores$NMDS2,
+  pch = 21,
+  bg = colores[nmds_scores$bebida],
+  col = "black",
+  cex = 2
+)
+
+text(
+  nmds_scores$NMDS1,
+  nmds_scores$NMDS2,
+  labels = nmds_scores$sample,
+  pos = 3,
+  cex = 0.8
+)
+
+legend(
+  "topright",
+  legend = names(colores),
+  col = colores,
+  pch = 19,
+  bty = "n",
+  title = "Beverage"
+)
+
+dev.off()
+
+message("Beta diversity analysis completed.")
