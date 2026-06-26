@@ -1,0 +1,30 @@
+Category,Subcategory,KO_PATTERNS,GENE_PATTERNS,REGEX_PATTERNS,CAZY_PATTERNS
+ComplexCarbs,Starch,K01176,\bamyA\b|\bmalP\b|alpha-?amylase|pullulanase|amylopullulanase,starch|maltodextrin,GH13
+ComplexCarbs,Beta-glucan / cellobiose,K05349,\bbglA\b|\bbglB\b|\bbglX\b|\bcelB\b|beta-?glucosidase,beta-?glucan|cellobiose,GH1|GH3
+ComplexCarbs,Xylan / hemicellulose,K01181,\bxynA\b|\bxynB\b|\bxylA\b|\bxylB\b|\babfA\b|xylanase|beta-?xylosidase|arabinofuranosidase,xylan|hemicellulose,GH10|GH11|GH43
+ComplexCarbs,Pectin,K01184,\bpel\b|\bpeh\b|\bpnl\b|polygalacturonase|pectate lyase|pectin lyase,pectin,GH28|PL[0-9]+
+ComplexCarbs,Fructan / inulin,K01193,\bsacA\b|\binu\b|\blevB\b|invertase|beta-?fructofuranosidase|inulinase,fructan|inulin,GH32
+ComplexCarbs,Oligosaccharides,K01190,\bmelA\b|\baga\b|\brafA\b|alpha-?galactosidase,raffinose|oligosaccharide,
+Vitamins,Vitamin B1,,\bthiC\b|\bthiD\b|\bthiE\b|\bthiG\b|\bthiH\b|\bthiL\b,thiamine biosynthesis|vitamin b1,
+Vitamins,Vitamin B2,,\bribA\b|\bribB\b|\bribD\b|\bribE\b|\bribH\b,riboflavin biosynthesis|vitamin b2,
+Vitamins,Vitamin B3,,\bnadA\b|\bnadB\b|\bnadC\b,quinolinate|nicotinate|nad biosynthesis|vitamin b3,
+Vitamins,Vitamin B5,,\bpanB\b|\bpanC\b|\bpanD\b|\bpanE\b,pantothenate|vitamin b5,
+Vitamins,Vitamin B6,,\bpdxA\b|\bpdxB\b|\bpdxJ\b|\bpdxH\b|\bpdxK\b,pyridoxine|pyridoxal|vitamin b6,
+Vitamins,Vitamin B7,,\bbioA\b|\bbioB\b|\bbioD\b|\bbioF\b,biotin biosynthesis|biotin synthase|vitamin b7,
+Vitamins,Vitamin B9,K01495|K00950|K00796|K00287,\bfolA\b|\bfolB\b|\bfolC\b|\bfolE\b|\bfolK\b|\bfolP\b|\bpabA\b|\bpabB\b|\bpabC\b,folate|tetrahydrofolate|dihydropteroate|vitamin b9,
+Vitamins,Vitamin B12,,\bcobA\b|\bcobI\b|\bcobJ\b|\bcobM\b|\bcobF\b|\bcobK\b|\bcobL\b|\bcobS\b|\bcobT\b|\bcobU\b|\bcobC\b,cobalamin biosynthesis|corrinoid|vitamin b12,
+Vitamins,Vitamin K,,\bmenA\b|\bmenB\b|\bmenC\b|\bmenD\b|\bmenE\b|\bmenF\b|\bmenG\b|\bmenH\b,menaquinone biosynthesis|vitamin k,
+SCFA,Acetate,K00625|K00925|K01895,\bpta\b|\backA\b|\bacs\b|phosphate acetyltransferase|acetate kinase|acetyl-?coa synthetase,acetate,
+SCFA,Butyrate,K00248|K00634|K00929,\bbcd\b|\bptb\b|\bbuk\b|\bhbd\b|\bcrt\b|\betfA\b|\betfB\b|\bthl\b|\batoB\b|butyryl-?coa dehydrogenase|butyrate kinase|phosphate butyryltransferase|butyryl-?coa:acetate coa-?transferase,butyrate|butanoate metabolism,
+SCFA,Propionate,K01847|K01848|K01026,\bmutA\b|\bmutB\b|\bpct\b|\bpduP\b|methylmalonyl-?coa mutase|propionate coa-?transferase|propionaldehyde dehydrogenase,propionate|propanoate metabolism,
+SCFA,Lactate / mixed fermentation,,\bldhA\b|\bldhB\b|\bldhD\b|lactate dehydrogenase,lactate fermentation|mixed acid fermentation|fermentation,
+OxidativeStress,Catalase,,\bkatA\b|\bkatE\b|\bkatG\b|catalase,hydrogen peroxide detoxification,
+OxidativeStress,Superoxide dismutase,,\bsodA\b|\bsodB\b|\bsodC\b|superoxide dismutase,superoxide,
+OxidativeStress,Peroxidase,,\bahpC\b|\bahpF\b|\bbcp\b|\btpx\b|peroxidase|peroxiredoxin|alkyl hydroperoxide reductase,peroxide stress,
+OxidativeStress,Glutathione,,\bgshA\b|\bgshB\b|\bgor\b|\bgrx\b|glutathione|glutaredoxin|glutathione reductase|glutathione peroxidase,,
+OxidativeStress,ROS response,,\boxyR\b|\bsoxR\b|\bsoxS\b,oxidative stress|reactive oxygen species|redox stress|ros response,
+AminoAcids,BCAA metabolism,,\bilvB\b|\bilvC\b|\bilvD\b|\bilvE\b|\bilvH\b,"branched-chain amino acid|valine, leucine and isoleucine|bcaa",
+AminoAcids,Histidine metabolism,,\bhutH\b|\bhutU\b|\bhutI\b|\bhutG\b|histidase,histidine metabolism|urocanate,
+AminoAcids,Tryptophan metabolism,,\btrpA\b|\btrpB\b|\btrpC\b|\btrpD\b|\btrpE\b|\btrpF\b|\btrpG\b,tryptophan metabolism|indole,
+AminoAcids,Arginine metabolism,,\barcA\b|\barcB\b|\barcC\b|\bargF\b|\bargG\b|\bargH\b|arginine deiminase,arginine metabolism|argininosuccinate,
+AminoAcids,Sulfur amino acids,,\bmetA\b|\bmetB\b|\bmetC\b|\bmetE\b|\bmetH\b|\bcysK\b|\bcysM\b|\bcysE\b,methionine metabolism|cysteine metabolism|homocysteine,
