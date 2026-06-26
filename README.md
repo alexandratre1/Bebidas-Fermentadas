@@ -115,11 +115,14 @@ gtdbtk classify_wf \
 ```
 
 ## 6. MAG Abundances Profile 
+```bash
+scripts/cover_M
+```
 Calculate the real relative abundance of each recovered MAG across all samples. Using CoverM, raw reads are mapped back to the consolidated MAGs database.
 
 ## 7. Functional annotation
 ```bash
-scripts/cover_M
+scripts/eggNOG_mapper
 ```
 Decodes the metabolic potential of the high-quality MAGs. Using eggNOG-mapper, proteins predicted from your genomes are annotated.
 
