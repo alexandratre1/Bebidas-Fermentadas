@@ -141,6 +141,12 @@ Utilize tidyverse and ggplot2 to process taxonomic tables and generate plots.
 install.packages("ggplot2")
 install.packages("vegan")
 install.packages("tidyverse")
+install.packages("patchwork")
+install.packages("VennDiagram")
+install.packages("UpSetR")
+install.packages("ggvenn")
+install.packages("RColorBrewer")
+install.packages("ape")
 ```
 The analyses included:
 ### Taxonomic Analysis
