@@ -84,7 +84,7 @@ gtdbtk classify_wf \
 --cpus 16
 ```
 
-## 6. MAG Abundances Profile (`scripts/run_coverm.sh`)
+## 6. MAG Abundances Profile 
 Calculate the real relative abundance of each recovered MAG across all samples. Using CoverM, raw reads are mapped back to the consolidated MAGs database.
 
 ## 7. Functional annotation
