@@ -47,8 +47,29 @@ conda activate metagenomics
 
 ## 1. Quality Control & Trimming 
 - FastQC
+
+ ```bash
+fastqc *_trimmed.fastq.
+
+%%%	Unzip documents
+
+for filename in *.zip
+do
+unzip $filename
+done
+```
+
 - MultiQC
+
+ ```bash
+multiqc
+```
+
 - Trimmomatic
+```bash
+scripts/trimming_SE
+scripts/trimming_PE
+```
 Processes raw Single-End (SE) and Paired-End .fastq.gz reads to remove low-quality bases and adapter sequences using Trimmomatic.
 Key parameters: SLIDINGWINDOW:4:20 MINLEN:50
 
