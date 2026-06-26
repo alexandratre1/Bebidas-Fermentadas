@@ -127,16 +127,36 @@ scripts/eggNOG_mapper
 Decodes the metabolic potential of the high-quality MAGs. Using eggNOG-mapper, proteins predicted from your genomes are annotated.
 
 ## 8. Genome-Scale Metabolic Modeling
+- GEM reconstruction
+Runs CarveMe on each MAG nucleotide FASTA to reconstruct genome-scale metabolic models (GEMs) in BiGG namespace using Diamond for functional annotation. Output: one .xml SBML file per genome.  Output: gem_quality_summary.csv and per-genome PDF summaries. Output: one .xml SBML file per genome.
 ```bash
 scripts/01_carveme_reconstruction.sh
 ```
-Runs CarveMe on each MAG nucleotide FASTA to reconstruct genome-scale metabolic models (GEMs) in BiGG namespace using Diamond for functional annotation. Output: one .xml SBML file per genome.
+- GEM quality assessment
+Loads each reconstructed GEM with COBRApy, runs FBA, and records reactions, metabolites, genes, growth rate, and solver status per genome. Output: gem_quality_summary.csv and per-genome PDF summaries.
+```bash
+scripts/02_gem_quality_assessment.py
+```
+- Community metabolic modeling and exchange network
+ Builds a 13-member community with MICOM, runs cooperative tradeoff FBA (fraction=0.5), extracts exchange fluxes, categorizes metabolites (amino acids, carbon sources, cofactors, nucleotides, ions), computes compatibility scores (net contribution 50% + connectivity 30% + diversity 20%), and generates three figures: exchange network for amino acids/carbon (Red 1), exchange network for cofactors/nucleotides/ions (Red 2), and compatibility score barplot. Also generates tabla_interacciones_13genomas.csv and compatibility_scores_13genomas.csv.
+```bash
+scripts/03_syncom_analysis.py
+```
+- Inducer/repressor leave-one-out analysis
+Performs leave-one-out (LOO) community simulations: removes each genome one at a time, re-runs cooperative tradeoff, and measures the growth rate change of all remaining members. Classifies interactions as inducer (removal decreases growth >5%), repressor (removal increases growth >5%), or neutral. Generates a delta_pct heatmap, an inducer/repressor network, and a summary barplot of how many organisms each genome induces or represses.
+```bash
+scripts/04_inducer_repressor_analysis.py
+```
+- Supplementary tables
+Assembles a multi-sheet Excel file from all previously generated CSVs: S1 genome summary, S2 all pairwise interactions, S3 producer-consumer pair summary, S4 metabolite summary.
+```bash
+supplementary/05_supplementary_tables.py
+```
 
 # 📊 R Analysis and Data Visualization
-The R scripts located in scripts_R/ 
-Microbial community composition, diversity, and functional profiles of fermented beverage samples were analyzed using R and multiple bioinformatic tools.
-Utilize tidyverse and ggplot2 to process taxonomic tables and generate plots.
- If you don't have ggplot2 installed, you can install it in an R session with:
+The R scripts located in `scripts_R/` were used to analyze the microbial community. The workflow integrates ecological analyses, comparative metagenomics, phylogenetic visualization, and biosynthetic gene cluster characterization to generate publication-quality figures and summary statistics.
+
+The workflow was developed primarily using the following R packages:
 ```r
 install.packages("ggplot2")
 install.packages("vegan")
